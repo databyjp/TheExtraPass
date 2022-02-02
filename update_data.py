@@ -5,13 +5,14 @@ import pandas as pd
 import utils
 from datetime import datetime
 import os
-dl_dir = utils.dl_dir
 
 logger = logging.getLogger(__name__)
 
 desired_width = 320
 pd.set_option('display.max_columns', 20)
 pd.set_option('display.width', desired_width)
+
+dl_dir = utils.dl_dir
 
 
 def fetch_pl_list(season_suffix):
