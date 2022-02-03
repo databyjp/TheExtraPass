@@ -1,5 +1,8 @@
 # Project specific
-dl_data
+dl_data/*
+!dl_data/README.md
+logs/*
+!logs/README.md
 
 # Mac files
 .DS_Store
