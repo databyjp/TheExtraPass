@@ -71,7 +71,7 @@ def update_season_pl_list(start_yr, end_yr):
     :return:
     """
     for season_yr in range(start_yr, end_yr+1):
-        season_suffix = utils.season_suffix(season_yr)
+        season_suffix = utils.year_to_season_suffix(season_yr)
         pl_list_outpath = os.path.join(dl_dir, f'{utils.file_prefixes["pl_list"]}_{season_suffix}.csv')
         if not os.path.exists(pl_list_outpath) or season_yr == utils.curr_season_yr():
             df = fetch_pl_list(season_suffix)
@@ -98,7 +98,7 @@ def update_season_pl_gamelogs():
         if not os.path.exists(pl_gl_outpath) or season_yr == utils.curr_season_yr():
             pl_df = pd.read_csv(fpath)
             pid_list = pl_df["PERSON_ID"].to_list()
-            df_gl = fetch_season_pl_gamelogs(pid_list, season_suffix, test_mode=True)
+            df_gl = fetch_season_pl_gamelogs(pid_list, season_suffix, test_mode=False)
             if df_gl is not None:
                 logger.info(f"Finished fetching {len(df_gl)} game logs for {season_suffix}")
                 logger.info(f"Saving game log data for {season_suffix}.")
