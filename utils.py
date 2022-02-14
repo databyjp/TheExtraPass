@@ -1,10 +1,13 @@
 # ========== (c) JP Hwang 2/2/2022  ==========
+import pandas as pd
 
 file_prefixes = {"pl_list": "common_all_players", "pl_gamelogs": "pl_gamelogs"}
 
 dl_dir = "dl_data"
 
 logfile_prefix = "dl_log_"
+
+def_start_year = 2015  # Default start year for multi-year based functions
 
 
 def year_to_season_suffix(season_yr):
@@ -38,3 +41,38 @@ def season_suffix_to_year(season_suffix):
     :return: year (int)
     """
     return int(season_suffix[2:4]) + 2000
+
+
+def load_gamelogs(st_year=None, end_year=None):
+    if st_year is None:
+        st_year = def_start_year
+    if end_year is None:
+        end_year = curr_season_yr() + 1
+
+    gldf_list = list()
+    for yr in range(st_year, end_year):
+        yr_suffix = year_to_season_suffix(yr)
+        t_df = pd.read_csv(f"dl_data/pl_gamelogs_{yr_suffix}.csv", dtype={"SEASON_ID": object, "Player_ID": object, "Game_ID": object})
+        t_df = t_df.assign(season=yr_suffix)
+        t_df = t_df.assign(eFG_PCT=((t_df["FGM"] * 2) + (t_df["FG3M"] * 3)) / ((t_df["FGA"] * 2) + (t_df["FG3A"] * 3)))
+        gldf_list.append(t_df)
+    gldf = pd.concat(gldf_list)
+
+    gldf = gldf.assign(gamedate_dt=pd.to_datetime(gldf["GAME_DATE"]))
+    return gldf
+
+
+def load_pl_list(st_year=None, end_year=None):
+    if st_year is None:
+        st_year = def_start_year
+    if end_year is None:
+        end_year = curr_season_yr() + 1
+
+    pldf_list = list()
+    for yr in range(st_year, end_year):
+        yr_suffix = year_to_season_suffix(yr)
+        t_pldf = pd.read_csv(f"dl_data/common_all_players_{yr_suffix}.csv", dtype={"PERSON_ID": object})
+        pldf_list.append(t_pldf)
+    pldf = pd.concat(pldf_list)
+    pldf.drop_duplicates(inplace=True)
+    return pldf

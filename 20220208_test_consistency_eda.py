@@ -37,19 +37,8 @@ fig = px.histogram(pdf, x="mpg", width=1200, height=700,)
 fig.show()
 
 # Let's use a larger dataset
-df_list = list()
-pldf_list = list()
-for yr in range(2015, 2022):
-    yr_suffix = utils.year_to_season_suffix(yr)
-    t_df = pd.read_csv(f"dl_data/pl_gamelogs_{yr_suffix}.csv")
-    t_df = t_df.assign(season=yr_suffix)
-    t_df = t_df.assign(eFG_PCT=((t_df["FGM"] * 2) + (t_df["FG3M"] * 3)) / ((t_df["FGA"] * 2) + (t_df["FG3A"] * 3)))
-    df_list.append(t_df)
-    t_pldf = pd.read_csv(f"dl_data/common_all_players_{yr_suffix}.csv")
-    pldf_list.append(t_pldf)
-df = pd.concat(df_list)
-pldf = pd.concat(pldf_list)
-pldf.drop_duplicates(inplace=True)
+df = utils.load_gamelogs()
+pldf = utils.load_pl_list()
 
 pdf = df.groupby(["Player_ID", "season"]).agg({"Game_ID": "count", "MIN": "sum"}).reset_index()
 pdf = pdf.assign(mpg=pdf["MIN"] / pdf["Game_ID"])

@@ -5,6 +5,7 @@ import pandas as pd
 import utils
 from datetime import datetime
 import os
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +128,57 @@ def update_season_pl_gamelogs():
     return True
 
 
+def fetch_box_score(json_dir, gm_id):
+    """
+    Download one box score from NBA API
+    :param json_dir: Directory for saving downloaded JSON
+    :param gm_id: NBA game ID
+    :return:
+    """
+    from nba_api.stats.endpoints import boxscoreadvancedv2
+    dl_path = os.path.join(json_dir, gm_id + ".json")
+    if os.path.exists(dl_path):
+        logger.info(f"JSON found for game {gm_id}, skipping download.")
+    else:
+        try:
+            logger.info(f"Downloading data for game {gm_id}")
+            try:
+                response = boxscoreadvancedv2.BoxScoreAdvancedV2(game_id=gm_id)
+            except:
+                logger.info(f"That didn't work - trying again with '00' prepended to game_id: {gm_id}")
+                gm_id = "00" + gm_id
+                response = boxscoreadvancedv2.BoxScoreAdvancedV2(game_id=gm_id)
+            content = json.loads(response.get_json())
+            if type(content) == dict:
+                with open(dl_path, 'w') as f:
+                    json.dump(content, f)
+                logger.info(f"Got data for game {gm_id}")
+            else:
+                logger.info(f"Saved data for game {gm_id} at {dl_path}")
+        except:
+            logger.error(f"Error getting data for game {gm_id}")
+
+    return True  # TODO - return something more sensible like a counter
+
+
+def update_box_scores(box_json_dir="dl_data/box_scores/json"):
+    """
+    Download all box scores from NBA API
+    :param box_json_dir: Directory to save downloads to
+    :return:
+    """
+    logger.info("Starting download of game box scores...")
+    gldf = utils.load_gamelogs()
+    gldf = gldf.sort_values("gamedate_dt")
+    gm_ids = gldf["Game_ID"].unique()
+
+    for gm_id in gm_ids[::-1]:
+        fetch_box_score(box_json_dir, gm_id)
+    logger.info("Finished downloading game box scores...")
+
+    return True
+
+
 def main():
     formatter = logging.Formatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -145,8 +197,9 @@ def main():
     fh.setFormatter(formatter)
     log.addHandler(fh)
 
-    update_season_pl_list(2015, 2021)
-    update_season_pl_gamelogs()
+    # update_season_pl_list(2015, 2021)
+    # update_season_pl_gamelogs()
+    update_box_scores()
 
 
 if __name__ == "__main__":
