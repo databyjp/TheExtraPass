@@ -199,7 +199,7 @@ def main():
 
     # update_season_pl_list(2015, 2021)
     # update_season_pl_gamelogs()
-    update_box_scores()
+    update_box_scores()  # TODO - need a faster way of fetching a list of all games
 
 
 if __name__ == "__main__":
