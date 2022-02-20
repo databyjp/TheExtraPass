@@ -1,12 +1,14 @@
 # ========== (c) JP Hwang 2/2/2022  ==========
 import pandas as pd
+import os
+import logging
 
+logger = logging.getLogger(__name__)
+
+# Parameters
 file_prefixes = {"pl_list": "common_all_players", "pl_gamelogs": "pl_gamelogs"}
-
 dl_dir = "dl_data"
-
 logfile_prefix = "dl_log_"
-
 def_start_year = 2015  # Default start year for multi-year based functions
 
 
@@ -43,7 +45,7 @@ def season_suffix_to_year(season_suffix):
     return int(season_suffix[2:4]) + 2000
 
 
-def load_gamelogs(st_year=None, end_year=None):
+def load_pl_gamelogs(st_year=None, end_year=None):
     if st_year is None:
         st_year = def_start_year
     if end_year is None:
@@ -58,6 +60,26 @@ def load_gamelogs(st_year=None, end_year=None):
         gldf_list.append(t_df)
     gldf = pd.concat(gldf_list)
 
+    gldf = gldf.assign(gamedate_dt=pd.to_datetime(gldf["GAME_DATE"]))
+    return gldf
+
+
+def load_tm_gamelogs(st_year=None, end_year=None):
+    if st_year is None:
+        st_year = def_start_year
+    if end_year is None:
+        end_year = curr_season_yr() + 1
+
+    gldf_list = list()
+    for yr in range(st_year, end_year):
+        yr_suffix = year_to_season_suffix(yr)
+        fpath = os.path.join("dl_data", f"tm_gamelogs_{yr_suffix}.csv")
+        if os.path.exists(fpath):
+            t_df = pd.read_csv(f"dl_data/tm_gamelogs_{yr_suffix}.csv")
+            gldf_list.append(t_df)
+        else:
+            logger.warning(f"File not found at {fpath}")
+    gldf = pd.concat(gldf_list)
     gldf = gldf.assign(gamedate_dt=pd.to_datetime(gldf["GAME_DATE"]))
     return gldf
 

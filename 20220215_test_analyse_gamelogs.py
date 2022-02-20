@@ -55,7 +55,7 @@ df = pd.concat(df_list)
 df = df[df["GAME_ID"].str[:5] == "00221"]
 
 # Merge/Join data from player logs as box score data doesn't include dates
-gldf = utils.load_gamelogs()
+gldf = utils.load_pl_gamelogs()
 df = pd.merge(
     df,
     gldf[["Game_ID", "gamedate_dt"]].drop_duplicates(),
