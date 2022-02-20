@@ -136,8 +136,11 @@ def fetch_box_score(json_dir, gm_id):
     :return:
     """
     from nba_api.stats.endpoints import boxscoreadvancedv2
+    gm_id = str(gm_id)
     dl_path = os.path.join(json_dir, gm_id + ".json")
     if os.path.exists(dl_path):
+        logger.info(f"JSON found for game {gm_id}, skipping download.")
+    elif os.path.exists(os.path.join(json_dir, '00' + gm_id + ".json")):
         logger.info(f"JSON found for game {gm_id}, skipping download.")
     else:
         try:
@@ -168,14 +171,54 @@ def update_box_scores(box_json_dir="dl_data/box_scores/json"):
     :return:
     """
     logger.info("Starting download of game box scores...")
-    gldf = utils.load_gamelogs()
+    # gldf = utils.load_pl_gamelogs()
+    gldf = utils.load_tm_gamelogs()
     gldf = gldf.sort_values("gamedate_dt")
-    gm_ids = gldf["Game_ID"].unique()
+    gm_ids = gldf["GAME_ID"].unique()
 
     for gm_id in gm_ids[::-1]:
         fetch_box_score(box_json_dir, gm_id)
     logger.info("Finished downloading game box scores...")
 
+    return True
+
+
+def json_to_df(content):
+    df_list = list()
+    for i in range(len(content["resultSets"])):
+        results = content["resultSets"][i]
+        headers = results["headers"]
+        rows = results["rowSet"]
+        tdf = pd.DataFrame(rows)
+        tdf.columns = headers
+        df_list.append(tdf)
+    df_out = pd.concat(df_list)
+    return df_out
+
+
+def get_season_gamelogs(season_yr=None):
+    """
+    Downloads game logs for a given season
+    :param season_yr:
+    :return:
+    """
+    from nba_api.stats.endpoints import teamgamelogs
+    tm_list = pd.read_csv("data/team_id_list.csv")
+    if season_yr is None:
+        season_yr = utils.curr_season_yr()
+    season_suffix = utils.year_to_season_suffix(season_yr)
+
+    tm_df_list = list()
+    for i, row in tm_list.iterrows():
+        team_id = row["TEAM_ID"]
+        response = teamgamelogs.TeamGameLogs(
+            team_id_nullable=str(team_id), season_nullable=season_suffix
+        )
+        content = json.loads(response.get_json())
+        tm_df = json_to_df(content)
+        tm_df_list.append(tm_df)
+    df = pd.concat(tm_df_list)
+    df.to_csv(f"dl_data/tm_gamelogs_{season_suffix}.csv", index=False)
     return True
 
 
@@ -198,8 +241,8 @@ def main():
     log.addHandler(fh)
 
     # update_season_pl_list(2015, 2021)
-    # update_season_pl_gamelogs()
-    update_box_scores()  # TODO - need a faster way of fetching a list of all games
+    get_season_gamelogs()
+    update_box_scores()
 
 
 if __name__ == "__main__":

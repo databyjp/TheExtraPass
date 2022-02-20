@@ -37,7 +37,7 @@ fig = px.histogram(pdf, x="mpg", width=1200, height=700,)
 fig.show()
 
 # Let's use a larger dataset
-df = utils.load_gamelogs()
+df = utils.load_pl_gamelogs()
 pldf = utils.load_pl_list()
 
 pdf = df.groupby(["Player_ID", "season"]).agg({"Game_ID": "count", "MIN": "sum"}).reset_index()
