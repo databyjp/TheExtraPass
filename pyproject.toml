@@ -10,6 +10,7 @@ nba-api = "^1.1.11"
 pandas = "^1.4.0"
 plotly = "^5.5.0"
 black = "^22.1.0"
+Pillow = "^9.0.1"
 
 [tool.poetry.dev-dependencies]
 
