@@ -128,72 +128,25 @@ def update_season_pl_gamelogs():
     return True
 
 
-def fetch_box_score(json_dir, gm_id):
+def update_gamedata(json_dir, datatype):
     """
-    Download one box score from NBA API
-    :param json_dir: Directory for saving downloaded JSON
-    :param gm_id: NBA game ID
-    :return:
-    """
-    from nba_api.stats.endpoints import boxscoreadvancedv2
-    gm_id = str(gm_id)
-    dl_path = os.path.join(json_dir, gm_id + ".json")
-    if os.path.exists(dl_path):
-        logger.info(f"JSON found for game {gm_id}, skipping download.")
-    elif os.path.exists(os.path.join(json_dir, '00' + gm_id + ".json")):
-        logger.info(f"JSON found for game {gm_id}, skipping download.")
-    else:
-        try:
-            logger.info(f"Downloading data for game {gm_id}")
-            try:
-                response = boxscoreadvancedv2.BoxScoreAdvancedV2(game_id=gm_id)
-            except:
-                logger.info(f"That didn't work - trying again with '00' prepended to game_id: {gm_id}")
-                gm_id = "00" + gm_id
-                response = boxscoreadvancedv2.BoxScoreAdvancedV2(game_id=gm_id)
-            content = json.loads(response.get_json())
-            if type(content) == dict:
-                with open(dl_path, 'w') as f:
-                    json.dump(content, f)
-                logger.info(f"Got data for game {gm_id}")
-            else:
-                logger.info(f"Saved data for game {gm_id} at {dl_path}")
-        except:
-            logger.error(f"Error getting data for game {gm_id}")
-
-    return True  # TODO - return something more sensible like a counter
-
-
-def update_box_scores(box_json_dir="dl_data/box_scores/json"):
-    """
-    Download all box scores from NBA API
-    :param box_json_dir: Directory to save downloads to
+    Download availble game-based data from NBA API
+    :param json_dir: Directory to save downloads to
     :return:
     """
     logger.info("Starting download of game box scores...")
-    # gldf = utils.load_pl_gamelogs()
     gldf = utils.load_tm_gamelogs()
     gldf = gldf.sort_values("gamedate_dt")
     gm_ids = gldf["GAME_ID"].unique()
 
+    err_counter = 0
     for gm_id in gm_ids[::-1]:
-        fetch_box_score(box_json_dir, gm_id)
-    logger.info("Finished downloading game box scores...")
+        dl_succ = utils.fetch_data_w_gameid(json_dir, gm_id, datatype=datatype)
+        if dl_succ is False:
+            err_counter += 1
+    logger.info(f"Finished downloading game box scores. {err_counter} errors encountered.")
 
     return True
-
-
-def json_to_df(content):
-    df_list = list()
-    for i in range(len(content["resultSets"])):
-        results = content["resultSets"][i]
-        headers = results["headers"]
-        rows = results["rowSet"]
-        tdf = pd.DataFrame(rows)
-        tdf.columns = headers
-        df_list.append(tdf)
-    df_out = pd.concat(df_list)
-    return df_out
 
 
 def get_season_gamelogs(season_yr=None):
@@ -215,7 +168,7 @@ def get_season_gamelogs(season_yr=None):
             team_id_nullable=str(team_id), season_nullable=season_suffix
         )
         content = json.loads(response.get_json())
-        tm_df = json_to_df(content)
+        tm_df = utils.json_to_df(content)
         tm_df_list.append(tm_df)
     df = pd.concat(tm_df_list)
     df.to_csv(f"dl_data/tm_gamelogs_{season_suffix}.csv", index=False)
@@ -242,7 +195,8 @@ def main():
 
     # update_season_pl_list(2015, 2021)
     get_season_gamelogs()
-    update_box_scores()
+    update_gamedata(json_dir="dl_data/box_scores/json", datatype="boxscore")
+    update_gamedata(json_dir="dl_data/pbp/json", datatype="pbp")
 
 
 if __name__ == "__main__":

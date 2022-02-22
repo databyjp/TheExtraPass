@@ -2,6 +2,7 @@
 import pandas as pd
 import os
 import logging
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -98,3 +99,61 @@ def load_pl_list(st_year=None, end_year=None):
     pldf = pd.concat(pldf_list)
     pldf.drop_duplicates(inplace=True)
     return pldf
+
+
+def json_to_df(content):
+    df_list = list()
+    for i in range(len(content["resultSets"])):
+        results = content["resultSets"][i]
+        headers = results["headers"]
+        rows = results["rowSet"]
+        tdf = pd.DataFrame(rows)
+        tdf.columns = headers
+        df_list.append(tdf)
+    df_out = pd.concat(df_list)
+    return df_out
+
+
+def fetch_data_w_gameid(json_dir, gm_id, datatype="boxscore"):
+    """
+    Download a datafile based on gameID as downloaded from NBA API & saves to file
+    :param json_dir: Directory for saving downloaded JSON
+    :param gm_id: NBA game ID
+    :param datatype: What data types to download - determines endpoint to use
+    :return:
+    """
+    from nba_api.stats.endpoints import boxscoreadvancedv2
+    from nba_api.live.nba.endpoints import playbyplay
+
+    if not os.path.exists(json_dir):
+        os.makedirs(json_dir)
+
+    if str(gm_id)[:2] != '00':
+        gm_id = '00' + str(gm_id)
+
+    dl_path = os.path.join(json_dir, gm_id + ".json")
+    if os.path.exists(dl_path):
+        logger.info(f"JSON found for game {gm_id}, skipping download.")
+    else:
+        try:
+            logger.info(f"Downloading data for game {gm_id}")
+            if datatype == "boxscore":
+                response = boxscoreadvancedv2.BoxScoreAdvancedV2(game_id=gm_id)
+            elif datatype == "pbp":
+                response = playbyplay.PlayByPlay(gm_id)
+            else:
+                logger.warning("No data type supplied, downloading box score data by default")
+                response = boxscoreadvancedv2.BoxScoreAdvancedV2(game_id=gm_id)
+
+            content = json.loads(response.get_json())
+            if type(content) == dict:
+                with open(dl_path, 'w') as f:
+                    json.dump(content, f)
+                logger.info(f"Got data for game {gm_id}")
+            else:
+                logger.info(f"Saved data for game {gm_id} at {dl_path}")
+        except:
+            logger.error(f"Error getting data for game {gm_id}")
+            return False
+
+    return True
