@@ -5,10 +5,11 @@ import pandas as pd
 import numpy as np
 import json
 import os
+import utils
 
 logger = logging.getLogger(__name__)
 root_logger = logging.getLogger()
-root_logger.setLevel(logging.INFO)
+root_logger.setLevel(logging.WARNING)
 sh = logging.StreamHandler()
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 sh.setFormatter(formatter)
@@ -38,52 +39,69 @@ for json_file in json_files:
 df = pd.concat(df_list)
 
 df = df.assign(realtime_dt=pd.to_datetime(df["timeActual"]))
-
 # ========== ADD ON-COURT PLAYERS ==========
 
 df = df.sort_values(["GAME_ID", "actionNumber"])
 df = df.reset_index(drop=True)
 
-gm_id = df["GAME_ID"].unique()[0]
-gm_df = df[df["GAME_ID"] == gm_id]
+box_df = utils.load_box_scores(data="player")
 
-tm_ids = [i for i in gm_df["teamId"].unique() if not np.isnan(i)]
+gm_dfs = list()
+for gm_id in df["GAME_ID"].unique():
+    logger.info(f"Processing game {gm_id}")
+    gm_df = df[df["GAME_ID"] == gm_id]
 
-subs_df = gm_df[gm_df["actionType"] == "substitution"]
+    tm_ids = [i for i in gm_df["teamId"].unique() if not np.isnan(i)]
 
-i = 1
-subs_df = subs_df[subs_df["teamId"] == tm_ids[i]]
-gm_df = gm_df[gm_df["teamId"] == tm_ids[i]]
+    for tm_i in range(2):
+        tm_id = tm_ids[tm_i]
+        subs_df = gm_df[gm_df["actionType"] == "substitution"]
+        subs_df = subs_df[subs_df["teamId"] == tm_id]
+        tm_df = gm_df[gm_df["teamId"] == tm_id]
 
-starter_list = list()
-sub_list = list()
-for row in gm_df.itertuples():
-    if row.actionType == "substitution":
-        if row.subType == "out":
-            if row.personId not in starter_list and row["personId"] not in sub_list:
-                starter_list.append(row.personId)
-        else:
-            if row.personId not in sub_list:
-                sub_list.append(row.personId)
+        starter_list = box_df[
+            (box_df["TEAM_ID"] == tm_id) & (box_df["GAME_ID"] == gm_id) & (box_df["START_POSITION"] != "")
+            ]["PLAYER_ID"].unique().tolist()
 
-for i in range(5):
-    gm_df.loc[:, "player" + str(i+1)] = starter_list[i]
+        for i in range(5):
+            tm_df.loc[:, "player" + str(i+1)] = starter_list[i]
 
-subout_buffer = list()
-for row in gm_df.itertuples():
-    if row.actionType == "substitution":
-        if row.subType == "out":
-            subout_buffer.append(row.personId)
-        else:
-            subout = subout_buffer.pop(0)
-            for j in range(5):
-                tmpcol = "player" + str(j+1)
-                if getattr(row, tmpcol) == subout:
-                    gm_df.loc[gm_df["actionNumber"] >= row.actionNumber, tmpcol] = row.personId
+        subout_buffer = list()
+        subin_buffer = list()
+        for row in tm_df.itertuples():
+            if row.actionType == "substitution":
+                if row.subType == "out":
+                    subout_buffer.append(row.personId)
+                else:
+                    subin_buffer.append(row.personId)
 
-gm_df.to_csv("temp/sub_test.csv")
+                if len(subin_buffer) > 0 and len(subout_buffer) > 0:
+                    subout = subout_buffer.pop(0)
+                    subin = subin_buffer.pop(0)
+                    for j in range(5):
+                        tmpcol = "player" + str(j+1)
+                        if getattr(row, tmpcol) == subout:
+                            tm_df.loc[tm_df["actionNumber"] >= row.actionNumber, tmpcol] = subin
 
-"""
-Iterate from first row down
-Main challenge: Need to infer starting player list; others known/knowable
-"""
+        if len(subout_buffer) != 0 or len(subin_buffer) != 0:
+            logger.warning(f"Something went wrong parsing {gm_id} for {tm_id}! subin_buffer: {subin_buffer}, subout_buffer: {subout_buffer}")
+
+        tm_df.rename({"player" + str(j+1): f"tm_{tm_i}_player" + str(j+1) for j in range(5)}, axis=1, inplace=True)
+        gm_df = pd.merge(
+            gm_df,
+            tm_df[["actionNumber"] + [f"tm_{tm_i}_player" + str(j+1) for j in range(5)]],
+            left_on="actionNumber",
+            right_on="actionNumber",
+            how="left",
+        )
+
+    for tm_i in range(2):
+        for j in range(5):
+            gm_df[f"tm_{tm_i}_player{j+1}"] = gm_df[f"tm_{tm_i}_player{j+1}"].ffill().bfill()
+
+    gm_dfs.append(gm_df)
+
+proc_df = pd.concat(gm_dfs)
+for pl_c in [c for c in gm_df.columns if "_player" in c]:
+    proc_df[pl_c] = proc_df[pl_c].astype(int)
+proc_df.to_csv("data/proc_data/proc_pbp.csv", index=False)

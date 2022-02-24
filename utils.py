@@ -157,3 +157,47 @@ def fetch_data_w_gameid(json_dir, gm_id, datatype="boxscore"):
             return False
 
     return True
+
+
+def box_json_to_df(content, data=None):
+    """
+    Load individual box score JSON to dataframe
+    :param content: Content data returned by NBA API
+    :param data: Specify player or team level data
+    :return: DataFrame of single game box score
+    """
+    if data is None:
+        sel_int = 1
+    elif data == "player":
+        sel_int = 0
+    else:
+        logger.warning("Unclear which data to load, loading team data by default.")
+        sel_int = 1
+
+    results = content["resultSets"][sel_int]
+    headers = results["headers"]
+    rows = results["rowSet"]
+    df = pd.DataFrame(rows)
+    df.columns = headers
+    return df
+
+
+def load_box_scores(data="team"):
+    """
+    Load all available box score data
+    :param data: Specify player or team level data
+    :return: DataFrame of multiple game box scores
+    """
+    json_dir = "dl_data/box_scores/json"
+    json_files = [i for i in os.listdir(json_dir) if i.endswith("json")]
+
+    df_list = list()
+    for json_file in json_files:
+        json_path = os.path.join(json_dir, json_file)
+        with open(json_path, 'r') as f:
+            content = json.load(f)
+        tdf = box_json_to_df(content, data=data)
+        df_list.append(tdf)
+    df = pd.concat(df_list)
+    return df
+
