@@ -55,12 +55,12 @@ df = pd.concat(df_list)
 df = df[df["GAME_ID"].str[:5] == "00221"]
 
 # Merge/Join data from player logs as box score data doesn't include dates
-gldf = utils.load_pl_gamelogs()
+gldf = utils.load_tm_gamelogs()
 df = pd.merge(
     df,
-    gldf[["Game_ID", "gamedate_dt"]].drop_duplicates(),
+    gldf[["GAME_ID", "gamedate_dt"]].drop_duplicates(),
     left_on="GAME_ID",
-    right_on="Game_ID",
+    right_on="GAME_ID",
     how="left",
 )
 
@@ -86,7 +86,7 @@ df = df.assign(legend="Other teams")
 df.loc[df["TEAM_NAME"] == highlight_tm, "legend"] = highlight_tm
 
 fig = px.scatter(df, x="DEF_RATING", y="OFF_RATING", color="legend",
-                 title=f"Game-by-game performances by the {highlight_tm} - '21-'22",
+                 title=f"The {highlight_tm} game-by-game - '21-'22",
                  color_discrete_sequence=["#dddddd", "#5D76A9"],
                  template="plotly_white", width=800, height=650,
                  labels={"OFF_RATING": "Offensive Rating (higher is better)",
@@ -189,5 +189,8 @@ for highlight_tm in ["Heat", "Bulls", "Bucks", "Cavaliers", "Suns", "Warriors", 
                        text="Good O, Bad D".upper(),
                        xanchor="right",
                        showarrow=False)
+
+    main_font = '"Source Sans Pro", "PT Sans", "Raleway", "Open Sans"'
+    fig.update_layout(font_family=main_font)
 
     fig.show()
