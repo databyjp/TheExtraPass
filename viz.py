@@ -259,7 +259,7 @@ def get_hexbin_stats(shots_df, gridsize=None, min_samples=None, min_freqs=2):
 
     # by local averaging
     # get closest points for averaging
-    smoothing = 1.5
+    smoothing = 2.5
     xy_df = pd.DataFrame([x, y, makes_by_hex, shots_by_hex]).transpose().rename({0: "x", 1: "y", 2: "makes", 3: "shots"}, axis=1)
     x_spacing = np.sort(xy_df.x.unique())[1] - np.sort(xy_df.x.unique())[0]
     y_spacing = np.sort(xy_df.y.unique())[1] - np.sort(xy_df.y.unique())[0]
