@@ -32,7 +32,7 @@ pd.set_option('display.width', desired_width)
 # pldf = pd.concat(pldf_list)
 # pldf.drop_duplicates(inplace=True)
 
-df = utils.load_gamelogs()
+df = utils.load_pl_gamelogs()
 pldf = utils.load_pl_list()
 
 # What about MPG

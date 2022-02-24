@@ -1,5 +1,6 @@
 # Project specific
 data/proc_data/*
+!data/proc_data/README.md
 dl_data/*
 !dl_data/README.md
 logs/*

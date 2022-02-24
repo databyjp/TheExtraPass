@@ -27,7 +27,7 @@ pd.set_option('display.width', desired_width)
 json_dir = "dl_data/box_scores/json"
 json_files = [i for i in os.listdir(json_dir) if i.endswith("json")]
 
-gldf = utils.load_gamelogs()
+gldf = utils.load_tm_gamelogs()
 
 
 def box_json_to_df(content, data="team"):
@@ -54,13 +54,15 @@ for json_file in json_files:
     tdf = box_json_to_df(content, data="team")
     df_list.append(tdf)
 df = pd.concat(df_list)
+
 df = df[df["GAME_ID"].str[:5] == "00221"]
 
+gldf["GAME_ID"] = '00' + gldf["GAME_ID"].astype(str)
 df = pd.merge(
     df,
-    gldf[["Game_ID", "gamedate_dt"]],
+    gldf[["GAME_ID", "gamedate_dt"]],
     left_on="GAME_ID",
-    right_on="Game_ID",
+    right_on="GAME_ID",
     how="left",
 )
 
