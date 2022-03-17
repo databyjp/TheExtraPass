@@ -129,10 +129,13 @@ for tm_id in shots_df.teamId.unique():
 
 all_gdfs = pd.concat(tm_gdfs)
 
+labels_dict = {"filt_start": "Shot distance", "rel_pts": "Pts <BR>gained/<BR> lost", "group": "Team",
+               "rel_freq": "Relative<BR>shot<BR>frequency"}
 fig = px.scatter(all_gdfs, y="filt_start", x="group", color="rel_freq", facet_row="shot_type",
                  title="Relative shot frequencies by distance",
                  color_continuous_scale=px.colors.diverging.RdYlBu_r,
                  template="plotly_white",
+                 labels=labels_dict,
                  category_orders={"group": tm_ranks})
 for k in fig.layout:
     if re.search('yaxis[1-9]+', k):
@@ -146,6 +149,7 @@ fig = px.scatter(all_gdfs, y="filt_start", x="group", color="rel_pts", facet_row
                  title="Where each team gains/loses points vs others",
                  color_continuous_scale=px.colors.diverging.RdYlBu_r,
                  template="plotly_white",
+                 labels=labels_dict,
                  category_orders={"group": tm_ranks})
 for k in fig.layout:
     if re.search('yaxis[1-9]+', k):
