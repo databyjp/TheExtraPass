@@ -4,6 +4,9 @@ import logging
 import pandas as pd
 import numpy as np
 import utils
+from nba_api.stats.static import players
+from nba_api.stats.static import teams
+import plotly.express as px
 
 logger = logging.getLogger(__name__)
 root_logger = logging.getLogger()
@@ -53,3 +56,30 @@ gdf = gdf.reset_index().rename({"period": "shot_atts"}, axis=1)
 gdf = gdf.assign(team="NBA")
 gdf = gdf.assign(shot_freq=gdf.shot_atts / gdf.shot_atts.sum())
 gdf = gdf.assign(shot_acc=gdf.shot_made / gdf.shot_atts)
+
+# ========================================
+# Now let's do the same for each team
+# ========================================
+shots_df["teamId"] = shots_df["teamId"].astype(int)
+gdf_list = list()
+for tm_id in shots_df.teamId.unique():
+    tm_df = shots_df[shots_df.teamId == tm_id]
+    tm_gdf = tm_df.groupby("shot_zone").agg({"shot_made": "sum", "period": "count"})
+    tm_gdf = tm_gdf.reset_index().rename({"period": "shot_atts"}, axis=1)
+    tm_name = teams.find_team_name_by_id(tm_id)["abbreviation"]
+    tm_gdf = tm_gdf.assign(team=tm_name)
+    tm_gdf = tm_gdf.assign(shot_freq=tm_gdf.shot_atts / tm_gdf.shot_atts.sum())
+    tm_gdf = tm_gdf.assign(shot_acc=tm_gdf.shot_made / tm_gdf.shot_atts)
+    tm_gdf = tm_gdf.assign(rel_freq=tm_gdf.shot_freq - gdf.shot_freq)
+    tm_gdf = tm_gdf.assign(rel_acc=tm_gdf.shot_acc - gdf.shot_acc)
+    tm_gdf = tm_gdf.assign(rel_ev=tm_gdf.rel_acc * 2)
+    tm_gdf.loc[tm_gdf["shot_zone"].str.contains("3pt"), "rel_ev"] = tm_gdf[tm_gdf["shot_zone"].str.contains("3pt")]["rel_acc"] * 3
+    gdf_list.append(tm_gdf)
+gdf_tot = pd.concat(gdf_list)
+
+tm_ranks = gdf_tot.groupby("team").sum()["rel_pts"].sort_values().index.to_list()
+fig = px.bar(gdf_tot, x="team", facet_row="shot_zone", y="shot_freq", color="rel_ev",
+                 color_continuous_scale=px.colors.diverging.RdYlBu_r, color_continuous_midpoint=0,
+                 category_orders={"team": tm_ranks})
+fig.update_traces(marker=dict(line=dict(width=1, color='DarkSlateGrey')))
+fig.show()
