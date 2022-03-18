@@ -77,6 +77,9 @@ for tm_id in shots_df.teamId.unique():
     gdf_list.append(tm_gdf)
 gdf_tot = pd.concat(gdf_list)
 
+gdf_tot = gdf_tot.assign(rel_pts=gdf_tot.rel_acc * gdf_tot.shot_freq * 2)
+gdf_tot.loc[gdf_tot["shot_zone"].str.contains("3pt"), "rel_pts"] = gdf_tot[gdf_tot["shot_zone"].str.contains("3pt")]["rel_pts"] * 1.5
+
 tm_ranks = gdf_tot.groupby("team").sum()["rel_pts"].sort_values().index.to_list()
 fig = px.bar(gdf_tot, x="team", facet_row="shot_zone", y="shot_freq", color="rel_ev",
                  color_continuous_scale=px.colors.diverging.RdYlBu_r, color_continuous_midpoint=0,
