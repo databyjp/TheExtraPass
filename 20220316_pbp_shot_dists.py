@@ -158,3 +158,5 @@ for k in fig.layout:
     if re.search('yaxis[1-9]+', k):
         fig.layout[k].update(matches=None)
 fig.show()
+
+all_gdfs.to_csv("data/proc_data/team_shot_profile_by_dist.csv")
