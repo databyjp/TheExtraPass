@@ -305,3 +305,89 @@ def add_pbp_oncourt_columns(df):
         proc_df[pl_c] = proc_df[pl_c].astype(int)
 
     return proc_df
+
+
+def calc_shot_dist_profile(df_in, grp_label, filt_start=0, filt_end=30, filt_width=2, filt_inc=0.25):
+    """
+    :param df_in: PbP log, filtered to include shots only
+    :param grp_label: Give it a group label
+    :param filt_start: Shortest distance to analyse - in feet
+    :param filt_end: Furthest distance to analyse - in feet
+    :param filt_width: Rolling window width for analysis - in feet
+    :param filt_inc: Increment for rolling window - in feet
+    :return: 
+    """
+    # Build more granular shot bins
+    ser_list = list()
+    window_range = 1 + int(((filt_end - filt_start) - filt_width) / filt_inc)
+    window_factor = filt_width / filt_inc
+    for i in range(window_range):
+        for shot_type in ["2pt", "3pt"]:
+            if (shot_type == '2pt' and filt_start <= 22) or (shot_type == '3pt' and filt_start >= 20):
+                filt_df = df_in[
+                    (df_in["shotDistance"] >= filt_start) &
+                    (df_in["shotDistance"] < (filt_start + filt_width)) &
+                    (df_in["actionType"] == shot_type)
+                    ]
+                if len(filt_df) > 0:
+                    ser = pd.Series({"shot_made": filt_df["shot_made"].sum(), "shot_atts": len(filt_df)})
+                    ser["shot_freq"] = ser.shot_atts / len(df_in) / window_factor  # To account for rolling window being wider than increment
+                    ser["shot_acc"] = ser.shot_made / ser.shot_atts
+                else:
+                    ser = pd.Series({"shot_made": 0, "shot_atts": 0})
+                    ser["shot_freq"] = 0
+                    ser["shot_acc"] = 0
+                ser["group"] = grp_label
+                ser["shot_type"] = shot_type
+                ser["filt_start"] = filt_start
+                ser["filt_end"] = filt_start + filt_width
+                ser["pts_pct"] = int(shot_type[0]) * ser["shot_freq"] * ser["shot_acc"]
+                ser_list.append(ser)
+        filt_start += filt_inc
+    df_out = pd.DataFrame(ser_list)
+    return df_out
+
+
+def get_shot_dist_df(df_in, ref_df=None):
+    """
+    Get a dataframe of shot profiles by distance 
+    :param df_in: PbP log, filtered to include shots only
+    :param ref_df: PbP shots log, for use to generate reference data
+    :return:
+    """
+    from nba_api.stats.static import teams
+    if ref_df is None:
+        ref_gdf = calc_shot_dist_profile(df_in, "NBA")
+    else:
+        ref_gdf = calc_shot_dist_profile(ref_df, "NBA")
+    tm_gdfs = list()
+    for tm_id in df_in.teamId.unique():
+        tm_df = df_in[df_in.teamId == tm_id]
+        tm_name = teams.find_team_name_by_id(tm_id)["abbreviation"]
+        tm_gdf = calc_shot_dist_profile(tm_df, tm_name)
+        # Set relative freqs
+        tm_gdf = tm_gdf.merge(ref_gdf[["shot_type", "filt_start", "shot_freq", "shot_acc", "pts_pct"]], how="inner", on=["shot_type", "filt_start"])
+        tm_gdf = tm_gdf.assign(rel_freq=tm_gdf.shot_freq_x - tm_gdf.shot_freq_y)  # X: Team freq; Y: NBA avg
+        tm_gdf = tm_gdf.assign(rel_acc=tm_gdf.shot_acc_x - tm_gdf.shot_acc_y)  # X: Team acc; Y: NBA avg
+        tm_gdf = tm_gdf.assign(rel_pts=tm_gdf.pts_pct_x - tm_gdf.pts_pct_y)  # X: Team pts; Y: NBA avg
+        tm_gdfs.append(tm_gdf)
+
+    gdf_out = pd.concat(tm_gdfs)
+    return gdf_out
+
+
+def load_shots_df():
+    """
+    Load PbP dataframe, and perform processing
+    :return:
+    """
+    df = load_pbp_jsons()
+    df = add_pbp_oncourt_columns(df)
+
+    # Only filter for shot data
+    shots_df = df[(df["actionType"] == "2pt") | (df["actionType"] == "3pt")]
+    shots_df["shot_made"] = False
+    shots_df.loc[shots_df["shotResult"] == "Made", "shot_made"] = True
+    shots_df["teamId"] = shots_df["teamId"].astype(int)
+    shots_df["timeActual"] = pd.to_datetime(shots_df.timeActual)
+    return shots_df
