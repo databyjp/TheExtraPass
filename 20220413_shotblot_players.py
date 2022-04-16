@@ -22,47 +22,15 @@ shots_df = utils.load_shots_df()
 ref_gdf = utils.calc_shot_dist_profile(shots_df, "NBA")
 gdf = utils.get_shot_dist_df(shots_df)
 
-# FILTER GAMES FOR THE LATEST DAY
-day_df = shots_df[shots_df["timeActual"].dt.date == shots_df["timeActual"].dt.date.max()]
-gm_ids = day_df.GAME_ID.unique().tolist()
-
-# for gm_id in gm_ids:  # OUTER LOOP FOR EACH GAME
-gm_id = gm_ids[0]
-gm_df = day_df[day_df.GAME_ID == gm_id]
-
-tm_ids = gm_df.teamId.unique().tolist()
-# for tm_id in tm_ids:
-tm_id = tm_ids[0]
-
-tm_abv = teams.find_team_name_by_id(tm_id)["abbreviation"]
-tm_gdf = gdf[gdf["group"] == tm_abv]
-
-tm_gm_df = gm_df[gm_df.teamId == tm_id]
-
-from nba_api.stats.static import players
-
-pl_ids = tm_gm_df.personId.unique()
-pl_gdfs = list()
-for pl_id in pl_ids:
-    pl_gm_df = tm_gm_df[tm_gm_df.personId == pl_id]
-    if (len(pl_gm_df)) > 0:
-        pl_gm_gdf = utils.get_shot_dist_df(pl_gm_df, shots_df)
-        pl_gm_gdf = pl_gm_gdf.assign(personId=pl_id)
-        pl_name = players.find_player_by_id(pl_id)["full_name"]
-        pl_gm_gdf = pl_gm_gdf.assign(player=pl_name)
-        pl_gdfs.append(pl_gm_gdf)
-
-pl_gdf = pd.concat(pl_gdfs)
-pl_ranks = pl_gdf.groupby("player").sum()["shot_atts"].sort_values().index.to_list()[::-1]
-
-import plotly.express as px
-import sys
-sys.path.append("/Users/jphwang/PycharmProjects/projects/prettyplotly")
-from prettyplotly import looks
-
-fig = px.scatter(pl_gdf, y="filt_start", x="player", size="shot_atts",
-                 color="pts_pct_x", color_continuous_scale=px.colors.sequential.Blues, template="plotly_white",
-                 category_orders={"player": pl_ranks})
-fig = looks.like_d3(fig)
-# fig = looks.update_scatter_markers(fig)
-fig.show()
+pl_limit = 10
+tm_abvs = [i["abbreviation"] for i in teams.get_teams()]
+for tm_abv in tm_abvs:
+    # tm_abv = "CHI"
+    tm_id = teams.find_team_by_abbreviation(tm_abv)["id"]
+    tm_df = shots_df[shots_df.teamId == tm_id]
+    pl_gdf = utils.get_pl_shot_dist_df(tm_df, shots_df)
+    pl_ranks = pl_gdf.groupby("group").sum()["shot_atts"].sort_values().index.to_list()[::-1]
+    pl_ranks = pl_ranks[:pl_limit]
+    pl_gdf = pl_gdf[pl_gdf["group"].isin(pl_ranks)]
+    pl_gdf = pl_gdf.assign(team=tm_abv)
+    pl_gdf.to_csv(f"temp/{tm_abv}_pl_shot_profile_by_dist.csv")
