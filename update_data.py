@@ -211,6 +211,7 @@ def main():
     update_gamedata(json_dir="dl_data/box_scores/json", datatype="boxscore")
     update_gamedata(json_dir="dl_data/pbp/json", datatype="pbp")
     process_pbp_logs()
+    utils.build_shots_df()
 
 
 if __name__ == "__main__":

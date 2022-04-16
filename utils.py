@@ -13,6 +13,7 @@ file_prefixes = {"pl_list": "common_all_players", "pl_gamelogs": "pl_gamelogs"}
 dl_dir = "dl_data"
 logfile_prefix = "dl_log_"
 def_start_year = 2015  # Default start year for multi-year based functions
+shots_df_loc = "data/proc_data/shots_pbp.csv"
 
 
 def year_to_season_suffix(season_yr):
@@ -376,7 +377,42 @@ def get_shot_dist_df(df_in, ref_df=None):
     return gdf_out
 
 
-def load_shots_df():
+def get_pl_shot_dist_df(df_in, ref_df=None):
+    """
+    Get a dataframe of shot profiles by distance
+    :param df_in: PbP log, filtered to include shots only
+    :param ref_df: PbP shots log, for use to generate reference data
+    :return:
+    """
+    from nba_api.stats.static import players
+    if ref_df is None:
+        ref_gdf = calc_shot_dist_profile(df_in, "NBA")
+    else:
+        ref_gdf = calc_shot_dist_profile(ref_df, "NBA")
+
+    pl_gdfs = list()
+    for pl_id in df_in.personId.unique():
+        pl_df = df_in[df_in.personId == pl_id]
+        corr_factor = len(df_in) / len(pl_df)
+        try:
+            pl_name = players.find_player_by_id(pl_id)["full_name"]
+        except:
+            pl_name = f"Player {pl_id}"
+        pl_gdf = calc_shot_dist_profile(pl_df, pl_name)
+        pl_gdf = pl_gdf.assign(shot_freq=pl_gdf["shot_freq"] / corr_factor)
+        pl_gdf = pl_gdf.assign(pts_pct=pl_gdf["pts_pct"] / corr_factor)
+        # Set relative freqs
+        pl_gdf = pl_gdf.merge(ref_gdf[["shot_type", "filt_start", "shot_freq", "shot_acc", "pts_pct"]], how="inner", on=["shot_type", "filt_start"])
+        pl_gdf = pl_gdf.assign(rel_freq=pl_gdf.shot_freq_x - pl_gdf.shot_freq_y)  # X: Team freq; Y: NBA avg
+        pl_gdf = pl_gdf.assign(rel_acc=pl_gdf.shot_acc_x - pl_gdf.shot_acc_y)  # X: Team acc; Y: NBA avg
+        pl_gdf = pl_gdf.assign(rel_pts=pl_gdf.pts_pct_x - pl_gdf.pts_pct_y)  # X: Team pts; Y: NBA avg
+        pl_gdfs.append(pl_gdf)
+
+    gdf_out = pd.concat(pl_gdfs)
+    return gdf_out
+
+
+def build_shots_df():
     """
     Load PbP dataframe, and perform processing
     :return:
@@ -390,4 +426,17 @@ def load_shots_df():
     shots_df.loc[shots_df["shotResult"] == "Made", "shot_made"] = True
     shots_df["teamId"] = shots_df["teamId"].astype(int)
     shots_df["timeActual"] = pd.to_datetime(shots_df.timeActual)
+    shots_df.to_csv(shots_df_loc)
+    return shots_df
+
+
+def load_shots_df():
+    """
+    Load PbP dataframe
+    :return:
+    """
+    if os.path.exists(shots_df_loc):
+        shots_df = pd.read_csv(shots_df_loc, index_col=0)
+    else:  # If dataframe not there; build a new one
+        shots_df = build_shots_df()
     return shots_df
