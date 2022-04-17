@@ -5,6 +5,7 @@ import pandas as pd
 import utils
 import json
 from nba_api.stats.static import teams, players
+import plotly.express as px
 
 logger = logging.getLogger(__name__)
 root_logger = logging.getLogger()
@@ -42,6 +43,12 @@ for tm_abv in tm_abvs:
     pl_gdf = pl_gdf[pl_gdf["group"].isin(pl_ranks)]
     pl_gdf = pl_gdf.assign(team=tm_abv)
     pl_gdfs.append(pl_gdf)
+    # # =========== To plot the data for a team - you can use ==========
+    # fig = px.scatter(pl_gdf, y="filt_start", x="group", size="shot_atts",
+    #                  color="pts_pct_x", color_continuous_scale=px.colors.sequential.Blues,
+    #                  template="plotly_white", width=900, height=650,
+    #                  category_orders={"group": pl_ranks_dict[tm_abv]})
+    # fig.show()
 comb_pl_gdf = pd.concat(pl_gdfs)
 comb_pl_gdf.to_csv("temp/shot_profiles_by_dist_players.csv")
 with open("temp/pl_shot_profiles_players.json", "w") as f:
