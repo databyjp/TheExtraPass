@@ -13,7 +13,7 @@ file_prefixes = {"pl_list": "common_all_players", "pl_gamelogs": "pl_gamelogs"}
 dl_dir = "dl_data"
 logfile_prefix = "dl_log_"
 def_start_year = 2015  # Default start year for multi-year based functions
-shots_df_loc = "data/proc_data/shots_pbp.csv"
+def_shots_df_loc = "data/proc_data/shots_pbp.csv"
 
 
 def year_to_season_suffix(season_yr):
@@ -412,13 +412,16 @@ def get_pl_shot_dist_df(df_in, ref_df=None):
     return gdf_out
 
 
-def build_shots_df():
+def build_shots_df(df_out_loc=None):
     """
     Load PbP dataframe, and perform processing
     :return:
     """
     df = load_pbp_jsons()
     df = add_pbp_oncourt_columns(df)
+    
+    if df_out_loc is None:
+        df_out_loc = def_shots_df_loc
 
     # Only filter for shot data
     shots_df = df[(df["actionType"] == "2pt") | (df["actionType"] == "3pt")]
@@ -426,17 +429,21 @@ def build_shots_df():
     shots_df.loc[shots_df["shotResult"] == "Made", "shot_made"] = True
     shots_df["teamId"] = shots_df["teamId"].astype(int)
     shots_df["timeActual"] = pd.to_datetime(shots_df.timeActual)
-    shots_df.to_csv(shots_df_loc)
+    shots_df.to_csv(df_out_loc)
     return shots_df
 
 
-def load_shots_df():
+def load_shots_df(shots_df_loc=None):
     """
     Load PbP dataframe
+    :param shots_df_loc:
     :return:
     """
+    if shots_df_loc is None:
+        shots_df_loc = def_shots_df_loc
+
     if os.path.exists(shots_df_loc):
         shots_df = pd.read_csv(shots_df_loc, index_col=0)
     else:  # If dataframe not there; build a new one
-        shots_df = build_shots_df()
+        shots_df = build_shots_df(shots_df_loc)
     return shots_df
