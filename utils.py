@@ -9,11 +9,14 @@ import json
 logger = logging.getLogger(__name__)
 
 # Parameters
-file_prefixes = {"pl_list": "common_all_players", "pl_gamelogs": "pl_gamelogs"}
+file_prefixes = {"pl_list": "common_all_players", "pl_gamelogs": "pl_gamelogs", "tm_gamelogs": "tm_gamelogs",
+                 "proc_pbp": "proc_pbp", "shots_pbp": "shots_pbp"}
 dl_dir = "dl_data"
+
 logfile_prefix = "dl_log_"
 def_start_year = 2015  # Default start year for multi-year based functions
 def_shots_df_loc = "data/proc_data/shots_pbp.csv"
+def_season_types = ["Regular Season", "Playoffs"]
 
 
 def year_to_season_suffix(season_yr):
@@ -50,6 +53,13 @@ def season_suffix_to_year(season_suffix):
 
 
 def load_pl_gamelogs(st_year=None, end_year=None):
+    """
+    DEPRECATED - Load game log (box score) data
+    :param st_year: Year to load data from (e.g. 20 for 2020-21 season)
+    :param end_year: Year to load data to (e.g. 21 for 2021-22 season)
+    :return:
+    """
+    logger.warning("DEPRECATED - CURRENTLY NOT USED / NOT MAINTAINED")
     if st_year is None:
         st_year = def_start_year
     if end_year is None:
@@ -68,27 +78,46 @@ def load_pl_gamelogs(st_year=None, end_year=None):
     return gldf
 
 
-def load_tm_gamelogs(st_year=None, end_year=None):
+def load_tm_gamelogs(st_year=None, end_year=None, season_types=None):
+    """
+    Load game log (box score) data
+    :param st_year: Year to load data from (e.g. 20 for 2020-21 season)
+    :param end_year: Year to load data to (e.g. 21 for 2021-22 season)
+    :param season_types: Season types (see def_season_types)
+    :return:
+    """
+    if season_types is None:
+        season_types = ["Regular Season", "Playoffs"]
+
     if st_year is None:
         st_year = def_start_year
     if end_year is None:
         end_year = curr_season_yr() + 1
 
     gldf_list = list()
-    for yr in range(st_year, end_year):
-        yr_suffix = year_to_season_suffix(yr)
-        fpath = os.path.join("dl_data", f"tm_gamelogs_{yr_suffix}.csv")
-        if os.path.exists(fpath):
-            t_df = pd.read_csv(fpath, dtype={"GAME_ID": "str"})
-            gldf_list.append(t_df)
-        else:
-            logger.warning(f"File not found at {fpath}")
+    for yr in range(st_year, end_year+1):
+        for season_type in season_types:
+            season_suffix = year_to_season_suffix(yr)
+            fname = get_fname('tm_gamelogs', season_suffix, season_type)
+            fpath = os.path.join("dl_data", fname)
+            if os.path.exists(fpath):
+                t_df = pd.read_csv(fpath, dtype={"GAME_ID": "str"})
+                gldf_list.append(t_df)
+            else:
+                logger.warning(f"File not found at {fpath}")
     gldf = pd.concat(gldf_list)
     gldf = gldf.assign(gamedate_dt=pd.to_datetime(gldf["GAME_DATE"]))
     return gldf
 
 
 def load_pl_list(st_year=None, end_year=None):
+    """
+    DEPRECATED
+    :param st_year: Year to load data from (e.g. 20 for 2020-21 season)
+    :param end_year: Year to load data to (e.g. 21 for 2021-22 season)
+    :return:
+    """
+    logger.warning("DEPRECATED - CURRENTLY NOT USED / NOT MAINTAINED")
     if st_year is None:
         st_year = def_start_year
     if end_year is None:
@@ -110,11 +139,21 @@ def json_to_df(content):
         results = content["resultSets"][i]
         headers = results["headers"]
         rows = results["rowSet"]
-        tdf = pd.DataFrame(rows)
-        tdf.columns = headers
-        df_list.append(tdf)
-    df_out = pd.concat(df_list)
-    return df_out
+        if len(rows) > 0:
+            tdf = pd.DataFrame(rows)
+            tdf.columns = headers
+            df_list.append(tdf)
+    if len(df_list) > 0:
+        return pd.concat(df_list)
+    else:
+        return None
+
+
+def get_json_path(json_dir, gm_id):
+    if str(gm_id)[:2] != '00':
+        gm_id = '00' + str(gm_id)
+    json_path = os.path.join(json_dir, gm_id + ".json")
+    return json_path
 
 
 def fetch_data_w_gameid(json_dir, gm_id, datatype="boxscore"):
@@ -131,11 +170,8 @@ def fetch_data_w_gameid(json_dir, gm_id, datatype="boxscore"):
     if not os.path.exists(json_dir):
         os.makedirs(json_dir)
 
-    if str(gm_id)[:2] != '00':
-        gm_id = '00' + str(gm_id)
-
-    dl_path = os.path.join(json_dir, gm_id + ".json")
-    if os.path.exists(dl_path):
+    json_path = get_json_path(json_dir, gm_id)
+    if os.path.exists(json_path):
         logger.info(f"JSON found for game {gm_id}, skipping download.")
     else:
         try:
@@ -150,11 +186,11 @@ def fetch_data_w_gameid(json_dir, gm_id, datatype="boxscore"):
 
             content = json.loads(response.get_json())
             if type(content) == dict:
-                with open(dl_path, 'w') as f:
+                with open(json_path, 'w') as f:
                     json.dump(content, f)
                 logger.info(f"Got data for game {gm_id}")
             else:
-                logger.info(f"Saved data for game {gm_id} at {dl_path}")
+                logger.info(f"Saved data for game {gm_id} at {json_path}")
         except:
             logger.error(f"Error getting data for game {gm_id}")
             return False
@@ -205,16 +241,18 @@ def load_box_scores(data="team"):
     return df
 
 
-def load_pbp_jsons(st_year=None, end_year=None):
+def load_pbp_jsons(st_year=None, end_year=None, season_types=None):
     """
     Load PBP JSON data
     :param st_year: Year to load data from (e.g. 20 for 2020-21 season)
     :param end_year: Year to load data to (e.g. 21 for 2021-22 season)
+    :param season_types: Season types (see def_season_types)
     :return: JSON dataframe
-    TODO - actually filter JSON data based on year parameters; currently loading all data
     """
+    gldf = load_tm_gamelogs(st_year=st_year, end_year=end_year, season_types=season_types)
+    gldf = gldf.sort_values("gamedate_dt")
+
     json_dir = "dl_data/pbp/json"
-    json_files = [i for i in os.listdir(json_dir) if i.endswith("json")]
 
     def pbp_json_to_df(content):
         df = pd.DataFrame(content['game']['actions'])
@@ -222,8 +260,8 @@ def load_pbp_jsons(st_year=None, end_year=None):
         return df
 
     df_list = list()
-    for json_file in json_files:
-        json_path = os.path.join(json_dir, json_file)
+    for gm_id in gldf.GAME_ID.unique():
+        json_path = get_json_path(json_dir, gm_id)
         with open(json_path, 'r') as f:
             content = json.load(f)
         tdf = pbp_json_to_df(content)
@@ -412,24 +450,18 @@ def get_pl_shot_dist_df(df_in, ref_df=None):
     return gdf_out
 
 
-def build_shots_df(df_out_loc=None):
+def build_shots_df(pbp_df):
     """
     Load PbP dataframe, and perform processing
     :return:
     """
-    df = load_pbp_jsons()
-    df = add_pbp_oncourt_columns(df)
-    
-    if df_out_loc is None:
-        df_out_loc = def_shots_df_loc
 
     # Only filter for shot data
-    shots_df = df[(df["actionType"] == "2pt") | (df["actionType"] == "3pt")]
+    shots_df = pbp_df[(pbp_df["actionType"] == "2pt") | (pbp_df["actionType"] == "3pt")]
     shots_df["shot_made"] = False
     shots_df.loc[shots_df["shotResult"] == "Made", "shot_made"] = True
     shots_df["teamId"] = shots_df["teamId"].astype(int)
     shots_df["timeActual"] = pd.to_datetime(shots_df.timeActual)
-    shots_df.to_csv(df_out_loc)
     return shots_df
 
 
@@ -447,3 +479,18 @@ def load_shots_df(shots_df_loc=None):
     else:  # If dataframe not there; build a new one
         shots_df = build_shots_df(shots_df_loc)
     return shots_df
+
+
+def get_fname(filetype, season_suffix, season_type):
+    """
+    Generate consistent filenames for saving/loading files
+    :param filetype:
+    :param season_suffix: "2021-22" etc.
+    :param season_type: "Regular season", "Playoffs"
+    :return:
+    """
+    if season_type == 'Playoffs':
+        po_suffix = '_playoffs'
+        return f"{file_prefixes[filetype]}_{season_suffix}{po_suffix}.csv"
+    else:
+        return f"{file_prefixes[filetype]}_{season_suffix}.csv"
