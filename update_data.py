@@ -130,14 +130,14 @@ def update_season_pl_gamelogs():
     return True
 
 
-def update_gamedata(json_dir, datatype, st_year=None, end_year=None, season_types=None):
+def update_gamedata(json_dir, datatype, st_year=None, end_year=None):
     """
     Download availble game-based data from NBA API
     :param json_dir: Directory to save downloads to
     :param season_type: Regular season or the Playoffs?
     :return:
     """
-    logger.info("Starting download of game box scores...")
+    logger.info(f"Starting download of game {datatype} data...")
     gldf = utils.load_tm_gamelogs(st_year=st_year, end_year=end_year, season_types=None)
     gldf = gldf.sort_values("gamedate_dt")
     gm_ids = gldf["GAME_ID"].unique()
@@ -147,7 +147,7 @@ def update_gamedata(json_dir, datatype, st_year=None, end_year=None, season_type
         dl_succ = utils.fetch_data_w_gameid(json_dir, gm_id, datatype=datatype)
         if dl_succ is False:
             err_counter += 1
-    logger.info(f"Finished downloading game box scores. {err_counter} errors encountered.")
+    logger.info(f"Finished downloading game {datatype} data between {st_year} and {end_year} seasons. {err_counter} errors encountered out of {len(gm_ids)}.")
 
     return True
 
@@ -231,7 +231,7 @@ def main():
     fh.setFormatter(formatter)
     log.addHandler(fh)
 
-    yr_ranges = [2021, 2019]
+    yr_ranges = [2021, 2015]
     for season_yr in range(yr_ranges[0], yr_ranges[1]-1, -1):
         logger.info(f'Processing {season_yr}')
 
@@ -240,8 +240,8 @@ def main():
             get_season_gamelogs(season_yr=season_yr, season_type=season_type)
 
         # Download PbP data & Box score data
-        update_gamedata(json_dir="dl_data/box_scores/json", datatype="boxscore", st_year=season_yr, end_year=season_yr, season_types=None)
-        update_gamedata(json_dir="dl_data/pbp/json", datatype="pbp", st_year=season_yr, end_year=season_yr, season_types=None)
+        update_gamedata(json_dir="dl_data/box_scores/json", datatype="boxscore", st_year=season_yr, end_year=season_yr)
+        update_gamedata(json_dir="dl_data/pbp/json", datatype="pbp", st_year=season_yr, end_year=season_yr)
 
         # Compile PbP data and save them by group
         process_pbp_logs(st_year=season_yr, end_year=season_yr)

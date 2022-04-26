@@ -167,6 +167,10 @@ def fetch_data_w_gameid(json_dir, gm_id, datatype="boxscore"):
     from nba_api.stats.endpoints import boxscoreadvancedv2
     from nba_api.live.nba.endpoints import playbyplay
 
+    if datatype not in ['boxscore', 'pbp']:
+        logger.warning(f'Supplied datatype ({datatype}) not recognised; defaulting to box score.')
+        datatype = 'boxscore'
+
     if not os.path.exists(json_dir):
         os.makedirs(json_dir)
 
@@ -175,24 +179,25 @@ def fetch_data_w_gameid(json_dir, gm_id, datatype="boxscore"):
         logger.info(f"JSON found for game {gm_id}, skipping download.")
     else:
         try:
-            logger.info(f"Downloading data for game {gm_id}")
+            logger.info(f"Downloading {datatype} data for game {gm_id}")
             if datatype == "boxscore":
                 response = boxscoreadvancedv2.BoxScoreAdvancedV2(game_id=gm_id)
             elif datatype == "pbp":
                 response = playbyplay.PlayByPlay(gm_id)
             else:
-                logger.warning("No data type supplied, downloading box score data by default")
-                response = boxscoreadvancedv2.BoxScoreAdvancedV2(game_id=gm_id)
+                logger.warning("Something is wrong, no valid data type supplied. Exiting")
+                return None
+
 
             content = json.loads(response.get_json())
             if type(content) == dict:
                 with open(json_path, 'w') as f:
                     json.dump(content, f)
-                logger.info(f"Got data for game {gm_id}")
+                logger.info(f"Got {datatype} data for game {gm_id}")
             else:
-                logger.info(f"Saved data for game {gm_id} at {json_path}")
+                logger.info(f"Saved {datatype} data for game {gm_id} at {json_path}")
         except:
-            logger.error(f"Error getting data for game {gm_id}")
+            logger.exception(f"Error getting {datatype} data for game {gm_id}")
             return False
 
     return True
