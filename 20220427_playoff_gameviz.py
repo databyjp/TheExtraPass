@@ -109,7 +109,7 @@ shot_blot_df = shot_blot_df.assign(filt_avg=(shot_blot_df["filt_start"] + shot_b
 
 import plotly.express as px
 fig = px.scatter(shot_blot_df,
-                 title=f'Playoff shot profile update - {latest_day_str}',
+                 title=f'{latest_day_str} - Playoff game shot profiles',
                  x="filt_avg", y="segment", size="pts_pct_x",
                  color="shot_ev", color_continuous_scale=px.colors.sequential.Blues,
                  facet_row="group", facet_col="shot_type",
@@ -131,6 +131,20 @@ for k in fig.layout:
 for i in fig.layout.annotations:
     if i['text'] == 'shot_type=3pt':
         i['x'] = 0.852
+
+
+# Increase the overall top margin, and move the title up slightly
+fig.update_layout(
+    margin=dict(t=140),
+    title={'y':0.95, 'yanchor': 'top'}
+)
+
+# Add the subhead
+fig.add_annotation(text="Marker size: Percentage of team points from that distance (1ft radius)<BR>Marker colour: Efficiency (points per shot)",
+                   xref="paper", yref="paper", align="left",
+                   font=dict(color="slategrey"),
+                   x=-0.065, y=1.15, showarrow=False)
+
 fig.show()
 
 # ============================================================
