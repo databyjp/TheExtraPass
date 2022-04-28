@@ -377,10 +377,12 @@ def calc_shot_dist_profile(df_in, grp_label, filt_start=0, filt_end=30, filt_wid
                     ser = pd.Series({"shot_made": filt_df["shot_made"].sum(), "shot_atts": len(filt_df)})
                     ser["shot_freq"] = ser.shot_atts / len(df_in) / window_factor  # To account for rolling window being wider than increment
                     ser["shot_acc"] = ser.shot_made / ser.shot_atts
+                    ser["shot_ev"] = ser.shot_made / ser.shot_atts * int(shot_type[0])
                 else:
                     ser = pd.Series({"shot_made": 0, "shot_atts": 0})
                     ser["shot_freq"] = 0
                     ser["shot_acc"] = 0
+                    ser["shot_ev"] = 0
                 ser["group"] = grp_label
                 ser["shot_type"] = shot_type
                 ser["filt_start"] = filt_start

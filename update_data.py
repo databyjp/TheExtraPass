@@ -231,7 +231,7 @@ def main():
     fh.setFormatter(formatter)
     log.addHandler(fh)
 
-    yr_ranges = [2021, 2015]
+    yr_ranges = [2021, 2021]
     for season_yr in range(yr_ranges[0], yr_ranges[1]-1, -1):
         logger.info(f'Processing {season_yr}')
 
