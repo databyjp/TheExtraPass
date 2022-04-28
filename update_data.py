@@ -40,11 +40,12 @@ def fetch_pl_list(season_suffix):
     return df_pl
 
 
-def fetch_season_pl_gamelogs(pid_list, season_suffix, test_mode=False):
+def fetch_season_pl_gamelogs(pid_list, season_suffix, season_type="Regular Season", test_mode=False):
     """
     Fetch players' game logs for a given season
     :param pid_list: List of API PERSON_IDs
     :param season_suffix: Season suffix string (e.g. '2020-21')
+    :param season_type: Season type (^(Regular Season)|(Pre Season)|(Playoffs)|(All-Star)|(All Star)$)
     :param test_mode: Bool for just getting a few logs
     :return: One dataframe with all the game log data
     """
@@ -55,7 +56,7 @@ def fetch_season_pl_gamelogs(pid_list, season_suffix, test_mode=False):
     df_gls = list()
     for pid in pid_list:
         df_gl = playergamelog.PlayerGameLog(
-            season=season_suffix, player_id=pid
+            season=season_suffix, player_id=pid, season_type_all_star=season_type
         ).player_game_log.get_data_frame()
         if len(df_gl) == 0:
             logger.warning(f"No games fetched for player {pid} in {season_suffix}!!")
@@ -129,14 +130,15 @@ def update_season_pl_gamelogs():
     return True
 
 
-def update_gamedata(json_dir, datatype):
+def update_gamedata(json_dir, datatype, st_year=None, end_year=None):
     """
     Download availble game-based data from NBA API
     :param json_dir: Directory to save downloads to
+    :param season_type: Regular season or the Playoffs?
     :return:
     """
-    logger.info("Starting download of game box scores...")
-    gldf = utils.load_tm_gamelogs()
+    logger.info(f"Starting download of game {datatype} data...")
+    gldf = utils.load_tm_gamelogs(st_year=st_year, end_year=end_year, season_types=None)
     gldf = gldf.sort_values("gamedate_dt")
     gm_ids = gldf["GAME_ID"].unique()
 
@@ -145,15 +147,16 @@ def update_gamedata(json_dir, datatype):
         dl_succ = utils.fetch_data_w_gameid(json_dir, gm_id, datatype=datatype)
         if dl_succ is False:
             err_counter += 1
-    logger.info(f"Finished downloading game box scores. {err_counter} errors encountered.")
+    logger.info(f"Finished downloading game {datatype} data between {st_year} and {end_year} seasons. {err_counter} errors encountered out of {len(gm_ids)}.")
 
     return True
 
 
-def get_season_gamelogs(season_yr=None):
+def get_season_gamelogs(season_yr=None, season_type=None):
     """
     Downloads game logs for a given season
     :param season_yr:
+    :param season_type: Season type (^(Regular Season)|(Pre Season)|(Playoffs)|(All-Star)|(All Star)$)
     :return:
     """
     from nba_api.stats.endpoints import teamgamelogs
@@ -166,24 +169,46 @@ def get_season_gamelogs(season_yr=None):
     for i, row in tm_list.iterrows():
         team_id = row["TEAM_ID"]
         response = teamgamelogs.TeamGameLogs(
-            team_id_nullable=str(team_id), season_nullable=season_suffix
+            team_id_nullable=str(team_id), season_nullable=season_suffix, season_type_nullable=season_type,
         )
         content = json.loads(response.get_json())
         tm_df = utils.json_to_df(content)
-        tm_df_list.append(tm_df)
+        if tm_df is not None:
+            tm_df_list.append(tm_df)
     df = pd.concat(tm_df_list)
-    df.to_csv(f"dl_data/tm_gamelogs_{season_suffix}.csv", index=False)
+
+    fname = utils.get_fname('tm_gamelogs', season_suffix, season_type)
+    out_path = os.path.join(dl_dir, fname)
+    df.to_csv(out_path, index=False)
     return True
 
 
-def process_pbp_logs():
+def process_pbp_logs(st_year, end_year):
     """
     Process all existing pbp data and save to file
+    :param st_year:
+    :param end_year:
     :return:
     """
-    df = utils.load_pbp_jsons()
-    proc_df = utils.add_pbp_oncourt_columns(df)
-    proc_df.to_csv("data/proc_data/proc_pbp.csv", index=False)
+
+    for yr in range(st_year, end_year + 1):
+        for season_type in utils.def_season_types:
+            df = utils.load_pbp_jsons(st_year=yr, end_year=yr, season_types=[season_type])
+            df = df.assign(season_type=season_type)
+            proc_df = utils.add_pbp_oncourt_columns(df)
+            season_suffix = utils.year_to_season_suffix(yr)
+
+            # Get proc_df
+            proc_df_fname = utils.get_fname('proc_pbp', season_suffix, season_type)
+            proc_df_dir = 'data/proc_data'
+            proc_df_fpath = os.path.join(proc_df_dir, proc_df_fname)
+            proc_df.to_csv(proc_df_fpath, index=False)
+
+            # Get shots_df
+            shots_df = utils.build_shots_df(proc_df)
+            shots_df_fname = utils.get_fname('shots_pbp', season_suffix, season_type)
+            shots_df_fpath = os.path.join(proc_df_dir, shots_df_fname)
+            shots_df.to_csv(shots_df_fpath, index=False)
 
     return True
 
@@ -206,12 +231,20 @@ def main():
     fh.setFormatter(formatter)
     log.addHandler(fh)
 
-    # update_season_pl_list(2015, 2021)
-    get_season_gamelogs()
-    update_gamedata(json_dir="dl_data/box_scores/json", datatype="boxscore")
-    update_gamedata(json_dir="dl_data/pbp/json", datatype="pbp")
-    process_pbp_logs()
-    utils.build_shots_df()
+    yr_ranges = [2021, 2021]
+    for season_yr in range(yr_ranges[0], yr_ranges[1]-1, -1):
+        logger.info(f'Processing {season_yr}')
+
+        # Update game logs
+        for season_type in [None, "Playoffs"]:
+            get_season_gamelogs(season_yr=season_yr, season_type=season_type)
+
+        # Download PbP data & Box score data
+        update_gamedata(json_dir="dl_data/box_scores/json", datatype="boxscore", st_year=season_yr, end_year=season_yr)
+        update_gamedata(json_dir="dl_data/pbp/json", datatype="pbp", st_year=season_yr, end_year=season_yr)
+
+        # Compile PbP data and save them by group
+        process_pbp_logs(st_year=season_yr, end_year=season_yr)
 
 
 if __name__ == "__main__":
