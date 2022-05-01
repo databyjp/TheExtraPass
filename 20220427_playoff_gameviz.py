@@ -57,7 +57,6 @@ latest_day_str = f"{latest_day.day-1} {latest_day.strftime('%b')} {latest_day.st
 # Get game IDs
 gm_ids = day_df.GAME_ID.unique()
 
-
 # ============================================================
 # Build shot blots for those games
 # ============================================================
@@ -69,18 +68,10 @@ def get_shotblot_dists(gdf_a, gdf_b, col_name):
     return dist
 
 
-def plot_shot_blot_charts():
-    return True
-
-
 shot_blot_dfs = list()
 for gm_id in gm_ids:
     gm_df = day_df[day_df.GAME_ID == gm_id]
     tm_ids = gm_df.teamId.unique()
-    #       Build shot blots for regular season (Offence & Defence)
-    #       Build shot blots for regular season match-ups
-    #       Build shot blots for series to date (Offence only - defence is just the inverse of each other)
-    #       Build shot blots for game
     for tm_id in tm_ids:
         tm = teams.find_team_name_by_id(tm_id)
         logger.info(f'Analysing game {gm_id} for {tm["full_name"]}')
@@ -107,7 +98,24 @@ for gm_id in gm_ids:
 shot_blot_df = pd.concat(shot_blot_dfs)
 shot_blot_df = shot_blot_df.assign(filt_avg=(shot_blot_df["filt_start"] + shot_blot_df["filt_end"])/2)
 
+# ============================================================
+# Initial viz
+# ============================================================
 import plotly.express as px
+fig = px.scatter(shot_blot_df,
+                 title=f'{latest_day_str} - Playoff game shot profiles',
+                 x="filt_avg", y="segment", size="shot_freq_x",
+                 color="shot_acc_x", color_continuous_scale=px.colors.sequential.Blues,
+                 facet_row="group",
+                 template="plotly_white", width=1200, height=750,
+                 labels={'filt_avg': 'Distance from the rim', 'segment': 'Sample size',
+                         'pts_pct_x': 'Proportion of points', 'shot_ev': 'Expected<BR>points<BR>per shot'}
+                 )
+fig.show()
+
+# ============================================================
+# Revised viz
+# ============================================================
 fig = px.scatter(shot_blot_df,
                  title=f'{latest_day_str} - Playoff game shot profiles',
                  x="filt_avg", y="segment", size="pts_pct_x",
@@ -146,11 +154,3 @@ fig.add_annotation(text="Marker size: Percentage of team points from that distan
                    x=-0.065, y=1.15, showarrow=False)
 
 fig.show()
-
-# ============================================================
-# Anything interesting?
-# ============================================================
-
-# ============================================================
-# Put together game summary viz
-# ============================================================

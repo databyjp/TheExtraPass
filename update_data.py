@@ -196,6 +196,7 @@ def process_pbp_logs(st_year, end_year):
             df = utils.load_pbp_jsons(st_year=yr, end_year=yr, season_types=[season_type])
             df = df.assign(season_type=season_type)
             proc_df = utils.add_pbp_oncourt_columns(df)
+            proc_df = utils.add_tm_name_cols(proc_df)
             season_suffix = utils.year_to_season_suffix(yr)
 
             # Get proc_df
@@ -232,6 +233,7 @@ def main():
     log.addHandler(fh)
 
     yr_ranges = [2021, 2021]
+    # TODO - investigate why some PbP downloads fail for 2019 and older
     for season_yr in range(yr_ranges[0], yr_ranges[1]-1, -1):
         logger.info(f'Processing {season_yr}')
 

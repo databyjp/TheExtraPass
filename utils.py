@@ -501,3 +501,32 @@ def get_fname(filetype, season_suffix, season_type):
         return f"{file_prefixes[filetype]}_{season_suffix}{po_suffix}.csv"
     else:
         return f"{file_prefixes[filetype]}_{season_suffix}.csv"
+
+
+def add_tm_name_cols(pbp_df):
+    """
+    Add columns with team name (and opponent name) to PbP DataFrames
+    :param pbp_df:
+    :return:
+    """
+    import os
+    tm_gamelogs_files = [f for f in os.listdir(dl_dir) if file_prefixes['tm_gamelogs'] in f]
+    tmp_dfs = list()
+    for fname in tm_gamelogs_files:
+        fpath = os.path.join(dl_dir, fname)
+        tmp_df = pd.read_csv(fpath)
+        tmp_dfs.append(tmp_df)
+    gamelogs_df = pd.concat(tmp_dfs)
+
+    pbp_df = pbp_df.assign(tm_abv=None)
+    pbp_df = pbp_df.assign(opp_abv=None)
+    for i, row in pbp_df.iterrows():
+        pbp_df.loc[row.name, 'tm_abv'] = gamelogs_df[
+            (gamelogs_df.GAME_ID == row["GAME_ID"]) &
+            (gamelogs_df.TEAM_ID == row["teamId"])
+            ]['TEAM_ABBREVIATION'].values[0]
+        pbp_df.loc[row.name, 'opp_abv'] = gamelogs_df[
+            (gamelogs_df.GAME_ID == row["GAME_ID"]) &
+            (gamelogs_df.TEAM_ID != row["teamId"])
+            ]['TEAM_ABBREVIATION'].values[0]
+    return pbp_df
