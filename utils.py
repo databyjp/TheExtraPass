@@ -438,20 +438,21 @@ def get_pl_shot_dist_df(df_in, ref_df=None):
     pl_gdfs = list()
     for pl_id in df_in.personId.unique():
         pl_df = df_in[df_in.personId == pl_id]
-        corr_factor = len(df_in) / len(pl_df)
-        try:
-            pl_name = players.find_player_by_id(pl_id)["full_name"]
-        except:
-            pl_name = f"Player {pl_id}"
-        pl_gdf = calc_shot_dist_profile(pl_df, pl_name)
-        pl_gdf = pl_gdf.assign(shot_freq=pl_gdf["shot_freq"] / corr_factor)
-        pl_gdf = pl_gdf.assign(pts_pct=pl_gdf["pts_pct"] / corr_factor)
-        # Set relative freqs
-        pl_gdf = pl_gdf.merge(ref_gdf[["shot_type", "filt_start", "shot_freq", "shot_acc", "pts_pct"]], how="inner", on=["shot_type", "filt_start"])
-        pl_gdf = pl_gdf.assign(rel_freq=pl_gdf.shot_freq_x - pl_gdf.shot_freq_y)  # X: Team freq; Y: NBA avg
-        pl_gdf = pl_gdf.assign(rel_acc=pl_gdf.shot_acc_x - pl_gdf.shot_acc_y)  # X: Team acc; Y: NBA avg
-        pl_gdf = pl_gdf.assign(rel_pts=pl_gdf.pts_pct_x - pl_gdf.pts_pct_y)  # X: Team pts; Y: NBA avg
-        pl_gdfs.append(pl_gdf)
+        if len(pl_df) > 0:
+            corr_factor = len(df_in) / len(pl_df)
+            try:
+                pl_name = players.find_player_by_id(pl_id)["full_name"]
+            except:
+                pl_name = f"Player {pl_id}"
+            pl_gdf = calc_shot_dist_profile(pl_df, pl_name)
+            pl_gdf = pl_gdf.assign(shot_freq=pl_gdf["shot_freq"] / corr_factor)
+            pl_gdf = pl_gdf.assign(pts_pct=pl_gdf["pts_pct"] / corr_factor)
+            # Set relative freqs
+            pl_gdf = pl_gdf.merge(ref_gdf[["shot_type", "filt_start", "shot_freq", "shot_acc", "pts_pct"]], how="inner", on=["shot_type", "filt_start"])
+            pl_gdf = pl_gdf.assign(rel_freq=pl_gdf.shot_freq_x - pl_gdf.shot_freq_y)  # X: Team freq; Y: NBA avg
+            pl_gdf = pl_gdf.assign(rel_acc=pl_gdf.shot_acc_x - pl_gdf.shot_acc_y)  # X: Team acc; Y: NBA avg
+            pl_gdf = pl_gdf.assign(rel_pts=pl_gdf.pts_pct_x - pl_gdf.pts_pct_y)  # X: Team pts; Y: NBA avg
+            pl_gdfs.append(pl_gdf)
 
     gdf_out = pd.concat(pl_gdfs)
     return gdf_out
@@ -521,12 +522,17 @@ def add_tm_name_cols(pbp_df):
     pbp_df = pbp_df.assign(tm_abv=None)
     pbp_df = pbp_df.assign(opp_abv=None)
     for i, row in pbp_df.iterrows():
-        pbp_df.loc[row.name, 'tm_abv'] = gamelogs_df[
-            (gamelogs_df.GAME_ID == row["GAME_ID"]) &
-            (gamelogs_df.TEAM_ID == row["teamId"])
-            ]['TEAM_ABBREVIATION'].values[0]
-        pbp_df.loc[row.name, 'opp_abv'] = gamelogs_df[
-            (gamelogs_df.GAME_ID == row["GAME_ID"]) &
-            (gamelogs_df.TEAM_ID != row["teamId"])
-            ]['TEAM_ABBREVIATION'].values[0]
+        try:
+            tms_found = gamelogs_df[
+                (gamelogs_df.GAME_ID == row["GAME_ID"]) &
+                (gamelogs_df.TEAM_ID == row["teamId"])
+            ]['TEAM_ABBREVIATION']
+            opps_found = gamelogs_df[
+                (gamelogs_df.GAME_ID == row["GAME_ID"]) &
+                (gamelogs_df.TEAM_ID != row["teamId"])
+            ]['TEAM_ABBREVIATION']
+            pbp_df.loc[row.name, 'tm_abv'] = tms_found.values[0]
+            pbp_df.loc[row.name, 'opp_abv'] = opps_found.values[0]
+        except:
+            logger.info(f'Error for row {i} - skipping adding team abv. Game id: {row["GAME_ID"]}; Row id: {row["teamId"]}')
     return pbp_df
