@@ -41,14 +41,22 @@ playoffs_df = utils.add_tm_name_cols(playoffs_df)
 playoffs_df = playoffs_df.assign(realtime_dt=pd.to_datetime(playoffs_df["realtime_dt"]))
 latest_day = playoffs_df["realtime_dt"].max().date()
 
-# latest_day = latest_day - datetime.timedelta(days=1)
-# day_df = playoffs_df[playoffs_df["realtime_dt"].dt.date == latest_day]
-# latest_day_str = f"{latest_day.day}_{latest_day.strftime('%b')}_{latest_day.strftime('%Y')}"
-#
-# # Get game IDs
-# gm_ids = day_df.GAME_ID.unique()
+# ========================================
+# To get GAME IDs for just the last few days
+# ========================================
+latest_day = latest_day - datetime.timedelta(days=7)
+day_df = playoffs_df[playoffs_df["realtime_dt"].dt.date >= latest_day]
+latest_day_str = f"{latest_day.day}_{latest_day.strftime('%b')}_{latest_day.strftime('%Y')}"
 
-gm_ids = playoffs_df.GAME_ID.unique()
+gm_ids = day_df.GAME_ID.unique()
+# ========================================
+
+# # ========================================
+# # To get GAME IDs for all games in the playoffs:
+# # ========================================
+# gm_ids = playoffs_df.GAME_ID.unique()
+# # ========================================
+
 for gm_id in gm_ids:
     shot_blot_dfs = list()
     gm_df = playoffs_df[playoffs_df.GAME_ID == gm_id]
