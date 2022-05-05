@@ -196,7 +196,6 @@ def process_pbp_logs(st_year, end_year):
             df = utils.load_pbp_jsons(st_year=yr, end_year=yr, season_types=[season_type])
             df = df.assign(season_type=season_type)
             proc_df = utils.add_pbp_oncourt_columns(df)
-            # proc_df = utils.add_tm_name_cols(proc_df)
             season_suffix = utils.year_to_season_suffix(yr)
 
             # Get proc_df

@@ -2,10 +2,8 @@
 
 import logging
 import pandas as pd
-import numpy as np
 import utils
 from nba_api.stats.static import teams, players
-import plotly.express as px
 import datetime
 
 
@@ -30,17 +28,13 @@ playoffs_df = pd.read_csv("data/proc_data/shots_pbp_2021-22_playoffs.csv")
 season_df = utils.add_tm_name_cols(season_df)
 playoffs_df = utils.add_tm_name_cols(playoffs_df)
 
-# Build NBA average shot blots
-nba_season_gdf = utils.calc_shot_dist_profile(season_df, "NBA_season")
-nba_playoffs_gdf = utils.calc_shot_dist_profile(playoffs_df, "NBA_playoffs")
-
 """
 # ===== GENERATE GAME REVIEW CHART
 # For each game:
-# Get season-long team charts
-# Get playoff team charts
-# Get game charts
-# For player also
+#   Get season-long team stripcharts
+#   Get playoff team charts
+#   Get team charts
+#   Develop strip charts for players also
 """
 
 # Filter data for the latest day
